@@ -4,12 +4,12 @@ CLI tool for generating marketing assets from brand config. Puppeteer-based, mul
 
 ## How it works
 
-1. You define your brand in a `brand.md` file (colors, fonts, tone, copy)
-2. You drop your assets (fonts, logos, images) into the brand folder
+1. You define your brand — either write a `brand.md` from scratch or **drop a PDF brand guidelines file** and let Claude Code extract everything for you
+2. You drop your assets (fonts, logos, images) into the brand folder — or let Claude download Google Fonts automatically
 3. You ask Claude Code to generate what you need — it writes a Puppeteer script that renders HTML/CSS to pixel-perfect images
 4. You get image files. Share them however you want.
 
-Claude Code reads your brand config, writes the generation script, runs it, and outputs the files. One script per asset type keeps things organized and easy to tweak.
+Claude Code orchestrates everything: reads your brand config, writes the generation script, runs it, and outputs the files. One script per asset type keeps things organized and easy to tweak.
 
 ## What it generates
 
@@ -24,7 +24,7 @@ Claude Code reads your brand config, writes the generation script, runs it, and 
 ## Setup
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/pixelagent.git
+git clone https://github.com/riveranatan/pixelagent.git
 cd pixelagent
 npm install
 ```
@@ -35,18 +35,46 @@ Requires Node.js 18+ and [Claude Code](https://docs.anthropic.com/en/docs/claude
 
 ### 1. Create your brand
 
+```bash
+node scripts/init-brand.mjs mybrand
+```
+
+This scaffolds the directory structure and a starter `brand.md`:
+
 ```
 brand/mybrand/
-├── brand.md              # Brand config (see below)
+├── brand.md              # Brand config (edit this)
 └── assets/
     ├── fonts/            # .ttf or .otf files
     ├── logos/            # Logo variants (.png, .svg)
     └── images/           # Photos, backgrounds, screenshots
 ```
 
-### 2. Write your brand.md
+### 2. Define your brand
 
-This is the single source of truth for your brand. Claude reads it before generating anything.
+**Have a PDF brand guide?** This is the fastest path. Drop it into your brand folder and let Claude Code do the rest:
+
+```bash
+# Drop your PDF into the brand folder
+cp ~/Downloads/my-brand-guidelines.pdf brand/mybrand/assets/
+```
+
+Then open Claude Code and say:
+
+```
+"Read the brand guidelines PDF in brand/mybrand/assets/ and create brand.md from it"
+```
+
+Claude Code reads the PDF directly, understands the design specs, and generates a complete `brand.md` with:
+- Color palette (hex values, names, usage)
+- Typography (font names, weights, hierarchy)
+- Logo usage rules
+- Tone of voice
+- Any other brand standards it finds
+
+If something is ambiguous in the PDF, Claude will ask you rather than guess.
+
+**No PDF? Starting from scratch?** Edit `brand.md` directly:
 
 ```markdown
 # My Brand
@@ -83,7 +111,18 @@ Direct, professional, etc.
 
 See [brand/_example/brand.md](brand/_example/brand.md) for a full example.
 
-### 3. Generate assets
+### 3. Download fonts
+
+For Google Fonts, download directly into your brand:
+
+```bash
+node scripts/lib/download-font.mjs --brand mybrand --font "Inter"
+node scripts/lib/download-font.mjs --brand mybrand --font "Montserrat" --weights "400,700,900"
+```
+
+For custom/commercial fonts, drop the `.ttf` or `.otf` files into `brand/mybrand/assets/fonts/`.
+
+### 4. Generate assets
 
 Open Claude Code in the project root and ask:
 
@@ -101,7 +140,7 @@ Claude will:
 4. Run it
 5. Output images to `brand/mybrand/output/`
 
-### 4. Run existing scripts
+### 5. Run existing scripts
 
 Once a script exists, run it directly:
 
@@ -122,11 +161,44 @@ pixelagent/
 │   └── _example/             # Reference brand
 ├── scripts/                  # Generation scripts
 │   ├── generate-*.mjs        # One per asset type
+│   ├── init-brand.mjs        # Scaffold a new brand
 │   └── lib/
-│       └── brand-loader.mjs  # Shared utilities
+│       ├── brand-loader.mjs  # Brand config parser & asset loaders
+│       ├── components.mjs    # Reusable phone mockups, layouts, etc.
+│       └── download-font.mjs # Google Fonts downloader
+├── reference/                # Best practices for asset generation
+│   └── social-media-best-practices.md
+├── .claude/commands/          # Slash commands (/import-brand, /generate, /new-brand)
 ├── CLAUDE.md                 # Agent instructions
 └── package.json
 ```
+
+## Slash commands
+
+pixelagent ships with Claude Code slash commands:
+
+| Command | What it does |
+|---------|-------------|
+| `/import-brand` | Read a PDF brand guidelines file and extract everything into `brand.md` |
+| `/new-brand` | Set up a new brand interactively — colors, fonts, tone |
+| `/generate` | Generate a marketing asset for a brand |
+
+```
+> /import-brand acme
+> /new-brand mybrand
+> /generate mybrand instagram carousel
+```
+
+## Claude Code is the engine
+
+pixelagent isn't a traditional CLI — Claude Code is the orchestrator. The repo provides structure (brand config, shared utilities, best practices) and Claude does the thinking:
+
+- **PDF → brand.md**: Drop a brand guidelines PDF and Claude extracts everything into a structured config file
+- **Script generation**: Describe what you want and Claude writes the Puppeteer script using your brand's colors, fonts, and assets
+- **Font sourcing**: Claude identifies fonts from your brand guide and downloads them from Google Fonts, or asks you to provide commercial fonts
+- **Best practices**: Claude references `reference/social-media-best-practices.md` for platform-specific sizing, typography rules, and layout patterns
+
+You talk to Claude in natural language. The scripts and config are just how it organizes its work.
 
 ## How scripts work
 
@@ -139,6 +211,16 @@ Each script is a self-contained Node.js file that:
 5. Screenshots the rendered page to a file
 
 Everything is embedded inline (base64 fonts, base64 images) so Puppeteer renders with zero external dependencies.
+
+## Shared components
+
+`scripts/lib/components.mjs` provides reusable building blocks:
+
+- **iPhone mockup** — realistic iPhone 16 Pro Max frame with Dynamic Island
+- **Android mockup** — Pixel-style frame with punch-hole camera
+- **Font-face generator** — auto-generate `@font-face` CSS from loaded fonts
+- **Carousel dots** — slide indicator component
+- **Base CSS** — reset + canvas sizing
 
 ## Adding scripts to package.json
 
@@ -177,6 +259,11 @@ pixelagent outputs image files to disk. You're free to connect whatever you want
 - Pipe into a CI/CD pipeline
 
 The tool stays focused on generation. Distribution is up to you.
+
+## Roadmap
+
+- **Image generation API** — plug in DALL-E, Flux, or other image gen APIs to create custom visuals, backgrounds, and illustrations directly from brand prompts
+- **Video generation** — [Remotion](https://remotion.dev) integration for animated social posts, reels, and promo videos rendered from the same brand config
 
 ## License
 

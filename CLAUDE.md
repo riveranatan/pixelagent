@@ -17,8 +17,13 @@ pixelagent/
 │   └── _example/             # Example brand for reference
 ├── scripts/                  # Generation scripts
 │   ├── generate-*.mjs        # One script per asset type
+│   ├── init-brand.mjs        # Scaffold a new brand
 │   └── lib/
-│       └── brand-loader.mjs  # Shared utilities
+│       ├── brand-loader.mjs  # Brand config parser & asset loaders
+│       ├── components.mjs    # Reusable HTML/CSS components (phone mockups, etc.)
+│       └── download-font.mjs # Google Fonts downloader
+├── reference/                # Best practices & guidelines
+│   └── social-media-best-practices.md
 ├── CLAUDE.md                 # This file
 └── package.json
 ```
@@ -132,21 +137,66 @@ Create one script per asset type. Name them descriptively:
 
 Each script is self-contained with its own HTML/CSS templates and copy. This keeps things simple and easy to modify per brand.
 
+## Available Utilities
+
+### brand-loader.mjs
+- `loadBrand(brandDir)` — Parse brand.md into structured config (name, colors, fonts, logos, tone, locales, copy)
+- `loadFonts(fontsDir, fontFiles)` — Load specific font files as base64 data URIs
+- `loadAllFonts(fontsDir)` — Auto-load all fonts from a directory, deriving weight keys from filenames
+- `loadImages(dir)` — Load all images from a directory as a filename→dataURI map
+- `imageToDataURI(filePath)` — Single image to base64 data URI
+- `ensureDir(dir)` — Create directory recursively
+- `resolveBrandDir(rootDir)` — Parse --brand CLI flag
+
+### components.mjs
+- `iphoneCSS(opts)` / `iphoneHTML(screenshotURI)` — iPhone 16 Pro Max mockup with Dynamic Island
+- `androidCSS(opts)` / `androidHTML(screenshotURI)` — Android Pixel-style mockup with punch-hole
+- `fontFaceCSS(family, fonts)` — Generate @font-face declarations from loaded fonts
+- `baseCSS(width, height)` — CSS reset + body sizing
+- `slideDotsCSS(accentColor)` / `slideDotsHTML(total, active)` — Carousel indicators
+
+### download-font.mjs
+Download Google Fonts directly into a brand's assets:
+```bash
+node scripts/lib/download-font.mjs --brand mybrand --font "Inter"
+node scripts/lib/download-font.mjs --brand mybrand --font "Montserrat" --weights "400,700,900"
+```
+
+## Importing Brand Guidelines from PDF
+
+When a user provides a PDF brand guidelines document:
+
+1. **Read the PDF** — it will be in `brand/<name>/assets/` or provided directly
+2. **Extract and structure** the following into `brand/<name>/brand.md`:
+   - Brand name, tagline, description
+   - Color palette (hex values, names, usage notes)
+   - Typography (font names, weights, hierarchy, sizes)
+   - Logo variants and usage rules
+   - Tone of voice and messaging guidelines
+   - Do's and don'ts
+3. **Identify fonts** — If the PDF specifies Google Fonts, download them:
+   ```bash
+   node scripts/lib/download-font.mjs --brand <name> --font "FontName"
+   ```
+   If the fonts are commercial/custom, note this in brand.md and ask the user to provide the .ttf/.otf files.
+4. **Extract logos** — Ask the user to export logos from the PDF or provide them as separate PNG/SVG files in `brand/<name>/assets/logos/`
+5. **Note anything ambiguous** — If the PDF has unclear specs, ask the user rather than guessing
+
+The goal is a complete, machine-readable `brand.md` that captures everything from the PDF so future asset generation doesn't need to re-read the PDF.
+
 ## Creating a New Brand
 
 When the user wants to add a brand:
 
-1. Create the directory structure:
+1. **Use the init script**:
+   ```bash
+   node scripts/init-brand.mjs mybrand
    ```
-   brand/<name>/
-   ├── brand.md
-   └── assets/
-       ├── fonts/
-       ├── logos/
-       └── images/
-   ```
+   This creates the directory structure and a starter brand.md template.
 
-2. Write `brand.md` following this format:
+2. **Or if they have a PDF**, import it (see "Importing Brand Guidelines from PDF" above).
+
+3. Write or refine `brand.md` following this format:
    ```markdown
    # Brand Name
 
@@ -178,8 +228,12 @@ When the user wants to add a brand:
    Describe the brand voice here.
    ```
 
-3. Ask the user to drop their assets (fonts, logos, images) into the appropriate folders
-4. Generate assets by writing scripts that read from brand.md
+3. **Download fonts** if using Google Fonts:
+   ```bash
+   node scripts/lib/download-font.mjs --brand <name> --font "FontName"
+   ```
+4. Ask the user to drop their assets (fonts, logos, images) into the appropriate folders
+5. Generate assets by writing scripts that read from brand.md
 
 ## Generating Brand Guidelines
 
@@ -208,12 +262,23 @@ Output each page as a separate image to `brand/<name>/output/guidelines/`.
 | YouTube | Thumbnail | 1280x720 |
 | YouTube | Banner | 2560x1440 |
 
+## Best Practices Reference
+
+Before generating social media posts, consult `reference/social-media-best-practices.md` for:
+- Platform-specific dimensions and safe zones
+- Typography size guidelines for readability
+- Color and contrast tips
+- Carousel structure (hook → value → CTA)
+- Photo overlay techniques
+
 ## Important Notes
 
 - **Always read `brand.md` first** before generating anything
+- **Read `reference/social-media-best-practices.md`** when creating social posts for the first time
 - **Never mix brand elements** between different brands
 - **Follow logo rules** — minimum sizes, clear space, no distortion
 - **Use the correct fonts** — each brand has its own typography
+- **Use shared components** from `scripts/lib/components.mjs` for phone mockups, font-face declarations, and common layouts
 - **Support locales** when the brand specifies multiple languages
 - **Output as files** — users handle distribution (APIs, uploads, etc.)
 - **One script per asset type** — keeps generation organized and maintainable
