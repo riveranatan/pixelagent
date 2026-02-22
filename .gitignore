@@ -1,0 +1,9 @@
+node_modules/
+.env
+
+# Brand output (generated files)
+brand/*/output/
+
+# OS files
+.DS_Store
+Thumbs.db

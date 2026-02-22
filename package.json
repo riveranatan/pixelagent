@@ -1,0 +1,12 @@
+{
+  "name": "pixelagent",
+  "version": "1.0.0",
+  "description": "CLI tool for generating marketing assets from brand config. Puppeteer-based, multi-brand, multi-locale. No design tools needed.",
+  "type": "module",
+  "scripts": {
+    "example": "node scripts/generate-example.mjs --brand _example"
+  },
+  "dependencies": {
+    "puppeteer": "^24.0.0"
+  }
+}
